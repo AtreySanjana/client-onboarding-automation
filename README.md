@@ -28,44 +28,44 @@ A single n8n workflow that:
 
 ## How It Works
 
-```
-Upload Data (CSV/JSON/Excel)
-    ↓
-Parse File
-    ↓
-Validate Each Row
-    ├─ Email format check
-    ├─ Required fields check
-    ├─ Duplicate detection
-    └─ Format standardization
-    ↓
-Transform Data
-    ├─ Normalize emails (lowercase, trim)
-    ├─ Format phone numbers (E.164)
-    ├─ Convert dates (→ YYYY-MM-DD)
-    ├─ Map roles to system enums
-    └─ Assign defaults for missing fields
-    ↓
-Check Database
-    └─ Query existing users (skip if found)
-    ↓
-Create Users
-    ├─ Insert into database
-    ├─ Generate temp password
-    └─ Log user IDs
-    ↓
-Send Welcome Emails
-    ├─ Temp credentials
-    ├─ Quick start guide
-    └─ Onboarding checklist (PDF)
-    ↓
-Notify Admin
-    ├─ Summary report (created, skipped, errors)
-    ├─ Email with details
-    └─ Slack notification
-    ↓
-Generate Metrics
-    └─ Log execution time, success rate, etc.
+```mermaid
+---
+config:
+  layout: elk
+---
+graph TD
+    A["📥 Webhook Trigger"] -->|CSV/JSON/Excel| B["Parse File"]
+    B --> C["Validate Rows"]
+    C -->|Check Fields & Format| D{"Valid?"}
+    D -->|No| E["🚩 Flag Errors"]
+    D -->|Yes| F["Normalize Data"]
+    E --> G["Continue Processing"]
+    F --> H["Check Duplicates"]
+    H --> I{"Exists?"}
+    I -->|Yes| J["⏭️ Skip User"]
+    I -->|No| K["Create User in DB"]
+    J --> L["Generate Summary"]
+    K --> M["Generate Temp Password"]
+    M --> N["Send Welcome Email"]
+    N --> O["Create Onboarding Checklist"]
+    O --> P["Notify Admins & Client"]
+    P --> L
+    L --> Q["📊 Log Metrics"]
+    Q --> R["✅ Complete"]
+    G --> L
+    
+    classDef input fill:#f0f9ff,stroke:#38bdf8,color:#1e1b4b
+    classDef process fill:#eef2ff,stroke:#818cf8,color:#1e1b4b
+    classDef decision fill:#fefce8,stroke:#facc15,color:#1e1b4b
+    classDef error fill:#fef2f2,stroke:#f87171,color:#1e1b4b
+    classDef output fill:#f0fdf4,stroke:#4ade80,color:#1e1b4b
+    classDef skip fill:#fff7ed,stroke:#fb923c,color:#1e1b4b
+    
+    class A input
+    class B,F,M,N,O,P,Q process
+    class D,I decision
+    class E,J error
+    class L,R output
 ```
 
 ## What It Actually Does
