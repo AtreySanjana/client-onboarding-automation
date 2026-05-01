@@ -1,0 +1,110 @@
+{
+  "company": "Tech Company Inc",
+  "import_date": "2024-04-30",
+  "employees": [
+    {
+      "email": "john.smith@company.com",
+      "full_name": "John Smith",
+      "role": "Manager",
+      "department": "Sales",
+      "phone": "555-1234",
+      "start_date": "01/15/2024"
+    },
+    {
+      "email": "  jane.doe@company.com  ",
+      "full_name": "jane doe",
+      "role": "engineer",
+      "department": null,
+      "phone": null,
+      "start_date": "03-02-2024"
+    },
+    {
+      "email": "bob@company.com",
+      "full_name": "Bob Johnson",
+      "role": "mngr",
+      "department": "Sales",
+      "phone": "5551234567",
+      "start_date": "2024-01-20"
+    },
+    {
+      "email": "alice@company.com",
+      "full_name": "Alice Chen",
+      "role": "support",
+      "department": "Customer Success",
+      "phone": "+1-555-9999",
+      "start_date": "Jan 20 2024"
+    },
+    {
+      "email": "dave.wilson@company.com",
+      "full_name": "Dave Wilson",
+      "role": "MANAGER",
+      "department": "OPERATIONS",
+      "phone": "(555) 123-4567",
+      "start_date": "2024.02.01"
+    },
+    {
+      "email": "emily.harris@company.com",
+      "full_name": "Emily Harris",
+      "role": "eng",
+      "department": "Engineering",
+      "phone": "555.567.8901",
+      "start_date": "Feb 15, 2024"
+    },
+    {
+      "email": "frank.martin@company.com",
+      "full_name": "Frank Martin",
+      "role": "developer",
+      "department": null,
+      "phone": null,
+      "start_date": "2024-02-20"
+    },
+    {
+      "email": "grace.lee@company.com",
+      "full_name": "GRACE LEE",
+      "role": "QA",
+      "department": "Quality Assurance",
+      "phone": "555-5555",
+      "start_date": "02/28/2024"
+    },
+    {
+      "email": "henry.taylor@company.com",
+      "full_name": "Henry Taylor",
+      "role": "Sales Rep",
+      "department": "Sales",
+      "phone": "+1 (555) 987-6543",
+      "start_date": "March 1 2024"
+    },
+    {
+      "email": "iris.brown@company.com",
+      "full_name": "Iris Brown",
+      "role": "hr",
+      "department": "Human Resources",
+      "phone": " 5554444444 ",
+      "start_date": "2024/03/05"
+    },
+    {
+      "email": "jack.anderson@company.com",
+      "full_name": "Jack Anderson",
+      "role": "Account Manager",
+      "department": "Account Management",
+      "phone": "555-333-2222",
+      "start_date": "3/10/2024"
+    },
+    {
+      "email": "kelly.garcia@company.com",
+      "full_name": "Kelly Garcia",
+      "role": "Product Manager",
+      "department": "Product",
+      "phone": null,
+      "start_date": "03-15-2024"
+    },
+    {
+      "email": "liam.rodriguez@company.com",
+      "full_name": "Liam Rodriguez",
+      "role": "manager",
+      "department": "Operations",
+      "phone": "555.111.2222",
+      "start_date": "2024-03-20"
+    }
+  ]
+}
