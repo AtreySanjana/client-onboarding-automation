@@ -314,6 +314,7 @@ This workflow has been tested with:
 - ✅ Email notifications
 
 See [IMPORT.md](IMPORT.md) for deployment checklist and production setup guide.
+See [link](https://drive.google.com/file/d/1Sn2U6pveREAKhnAsYCdxgJQtdksp9Tf7/view?usp=sharing) for complete video explanation.
 
 ---
 
