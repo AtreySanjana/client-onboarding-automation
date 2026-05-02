@@ -1,0 +1,938 @@
+{
+  "name": "Automated Client Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/onboarding/import",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -112,
+        -256
+      ],
+      "id": "541e1c56-e24d-40a8-a57f-e39d09eb245a",
+      "name": "Webhook",
+      "webhookId": "daa70a9e-349b-42b8-a224-f5ddf1facccb"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {
+          "includeUnpaired": true
+        }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        912,
+        -256
+      ],
+      "id": "35fb2489-cf77-4c24-824c-40b03229fadc",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -112,
+        128
+      ],
+      "id": "bcfe0f94-5957-4892-aa82-e2765133eba6",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        -256
+      ],
+      "id": "66e642fc-e75d-46f4-ad38-bd1b2b86ab80",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\nconst errors = [];\n\nif (!row.email || row.email.trim() === '') {\n  errors.push('Missing email address');\n} else {\n  const email = row.email.trim().toLowerCase();\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  if (!emailRegex.test(email)) {\n    errors.push('Invalid email format');\n  }\n}\n\nreturn {\n  email: (row.email || '').trim().toLowerCase(),\n  email_valid: errors.length === 0,\n  errors\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        144
+      ],
+      "id": "c04512cc-e506-4c23-a402-d9bfcc4c1b9d",
+      "name": "Validate Email"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "964b7324-5b42-4617-8730-d899b21a3313",
+              "leftValue": "={{ $node['Webhook'].json.body.file_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        304,
+        -256
+      ],
+      "id": "1d1f5968-06cc-4ee6-96f8-be49380395f1",
+      "name": "Data Vs. URL"
+    },
+    {
+      "parameters": {
+        "url": "={{ $node[\"Webhook\"].json.body.file_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        544,
+        -336
+      ],
+      "id": "bce2d272-b478-402b-befa-14944db964eb",
+      "name": "Download File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fileFormat = $node[\"Webhook\"].json.body.file_format || 'csv';\nconst fileContent = $node[\"Download File\"].data.body;\n\nlet data = [];\n\nif (fileFormat === 'csv') {\n  // Parse CSV - simple comma-separated parser\n  const lines = fileContent.split('\\n').filter(line => line.trim());\n  const headers = lines[0].split(',').map(h => h.trim());\n  \n  for (let i = 1; i < lines.length; i++) {\n    const values = lines[i].split(',').map(v => v.trim());\n    const row = {};\n    headers.forEach((header, idx) => {\n      row[header] = values[idx] || '';\n    });\n    data.push(row);\n  }\n}\n\nif (fileFormat === 'json') {\n  const parsed = JSON.parse(fileContent);\n  data = Array.isArray(parsed) ? parsed : (parsed.employees || parsed.data || []);\n}\n\nreturn { data };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        -336
+      ],
+      "id": "5fe177bf-1e32-45db-a2da-4f37bd62a51e",
+      "name": "Parse File Based on Format"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $node[\"Webhook\"].json.body.data || $node[\"Webhook\"].json.body.employees || [];\n\nreturn { data };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -192
+      ],
+      "id": "f4c1ab3e-2c45-45c8-8310-4214b6d2621d",
+      "name": "Extract Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\nconst prevErrors = $node[\"Validate Email\"].json.errors || [];\nconst errors = [...prevErrors];\n\nif (!row.full_name || row.full_name.trim() === '') {\n  errors.push('Missing full name');\n}\n\nif (!row.role || row.role.trim() === '') {\n  errors.push('Missing role');\n}\n\nif (!row.department || row.department.trim() === '') {\n  errors.push('Missing department');\n}\n\nif (!row.phone || row.phone.trim() === '') {\n  errors.push('Missing phone number');\n}\n\nif (!row.start_date || row.start_date.trim() === '') {\n  errors.push('Missing start date');\n}\n\nreturn {\n  required_fields_valid: errors.length === prevErrors.length,\n  errors\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        144
+      ],
+      "id": "4acb9f81-621e-4aa4-983a-173da9985410",
+      "name": "Validate Required Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c2235821-d1b9-4f03-ba04-bbba8dafc988",
+              "leftValue": "={{ $node[\"Validate Required Fields\"].json.errors.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        144
+      ],
+      "id": "ecd31b4b-6a74-4b70-b0f9-6d09c8a29db2",
+      "name": "Validation Passed?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\n\nfunction toTitleCase(str) {\n  return str\n    .trim()\n    .split(' ')\n    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())\n    .join(' ');\n}\n\nreturn {\n  email: row.email.trim().toLowerCase(),\n  full_name: toTitleCase(row.full_name),\n  full_name_original: row.full_name\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        352
+      ],
+      "id": "df42d94d-55ea-48a1-b923-7f67b02994d4",
+      "name": "Normalize Email & Name"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\nconst phone = row.phone || '';\n\nfunction normalizePhone(phoneString) {\n  if (!phoneString || phoneString.trim() === '') return null;\n  \n  let cleaned = phoneString.trim().replace(/[^\\d+]/g, '');\n  \n  if (!cleaned.startsWith('+')) {\n    cleaned = '+1' + cleaned;\n  }\n  \n  const digitCount = cleaned.replace(/\\D/g, '').length;\n  if (digitCount < 7 || digitCount > 15) {\n    return null; // Invalid\n  }\n  \n  return cleaned;\n}\n\nreturn {\n  phone: normalizePhone(phone),\n  phone_original: phone\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        352
+      ],
+      "id": "0637469b-3353-4603-8b6e-baf04ebc7d7b",
+      "name": "Normalize Phone Number"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\nconst dateString = row.start_date || '';\n\nfunction parseDate(str) {\n  if (!str) return null;\n\n  const s = str.trim();\n  let date = null;\n\n  // MM/DD/YYYY\n  let match = s.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);\n  if (match) {\n    date = new Date(match[3], parseInt(match[1]) - 1, match[2]);\n  }\n\n  // YYYY-MM-DD\n  match = s.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/);\n  if (match) {\n    date = new Date(match[1], parseInt(match[2]) - 1, match[3]);\n  }\n\n  // DD-MM-YYYY or MM-DD-YYYY\n  match = s.match(/^(\\d{1,2})-(\\d{1,2})-(\\d{4})$/);\n  if (match) {\n    const day = parseInt(match[1]);\n    const month = parseInt(match[2]);\n    if (day > 12) {\n      date = new Date(match[3], month - 1, day);\n    } else {\n      date = new Date(match[3], day - 1, month);\n    }\n  }\n\n  // ✅ NEW: Month DD YYYY or Month DD, YYYY (e.g. \"Jan 20 2024\", \"March 1 2024\", \"Feb 15, 2024\")\n  match = s.match(/^([A-Za-z]+)\\s+(\\d{1,2}),?\\s+(\\d{4})$/);\n  if (match) {\n    const parsed = new Date(`${match[1]} ${match[2]} ${match[3]}`);\n    if (!isNaN(parsed)) date = parsed;\n  }\n\n  // ✅ NEW: YYYY/MM/DD (e.g. \"2024/03/05\")\n  match = s.match(/^(\\d{4})\\/(\\d{1,2})\\/(\\d{1,2})$/);\n  if (match) {\n    date = new Date(match[1], parseInt(match[2]) - 1, match[3]);\n  }\n\n  // ✅ NEW: YYYY.MM.DD (e.g. \"2024.02.01\")\n  match = s.match(/^(\\d{4})\\.(\\d{1,2})\\.(\\d{1,2})$/);\n  if (match) {\n    date = new Date(match[1], parseInt(match[2]) - 1, match[3]);\n  }\n\n  if (date && !isNaN(date)) {\n    return date.toISOString().split('T')[0];\n  }\n\n  return null;\n}\n\nreturn {\n  start_date: parseDate(dateString),\n  start_date_original: dateString\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        352
+      ],
+      "id": "9a8e5aba-ed1d-4db8-ad21-46760f058f6d",
+      "name": "Normalize Date"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\n\nconst roleMapping = {\n  'manager': 'MANAGER',\n  'mgr': 'MANAGER',\n  'mngr': 'MANAGER',\n  'engineer': 'ENGINEER',\n  'eng': 'ENGINEER',\n  'developer': 'ENGINEER',\n  'dev': 'ENGINEER',\n  'support': 'SUPPORT',\n  'support rep': 'SUPPORT',\n  'customer success': 'SUPPORT',\n  'sales': 'SALES',\n  'sales rep': 'SALES',\n  'account manager': 'SALES',\n  'hr': 'HR',\n  'human resources': 'HR',\n  'qa': 'QA',\n  'quality assurance': 'QA',\n  'product manager': 'PRODUCT_MANAGER',\n  'product': 'PRODUCT_MANAGER',\n  'pm': 'PRODUCT_MANAGER'\n};\n\nconst inputRole = (row.role || '').trim().toLowerCase();\nconst mappedRole = roleMapping[inputRole];\n\nreturn {\n  role: mappedRole || null,\n  role_original: row.role,\n  role_valid: !!mappedRole\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        352
+      ],
+      "id": "240e3f54-7c50-4c99-a898-08fac31d7c1a",
+      "name": "Map Roles to Enum"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $node[\"Loop Over Items\"].json;\n\nconst departmentDefaults = {\n  'MANAGER': 'Administration',\n  'ENGINEER': 'Engineering',\n  'SUPPORT': 'Customer Success',\n  'SALES': 'Sales',\n  'HR': 'Human Resources',\n  'QA': 'Quality Assurance',\n  'PRODUCT_MANAGER': 'Product'\n};\n\nlet department = (row.department || '').trim();\n\nif (department === '') {\n  department = departmentDefaults[row.role] || 'General';\n}\n\nreturn {\n  department\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        352
+      ],
+      "id": "53ebf159-ed03-45ca-9217-607dfec4901c",
+      "name": "Assign Department Default"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, email, created_at \nFROM users \nWHERE LOWER(email) = LOWER($1)\nLIMIT 1",
+        "options": {
+          "queryReplacement": "=$1 = {{ $node[\"Normalize Email & Name\"].json.email }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        352
+      ],
+      "id": "bb44f152-3249-4cfa-9aed-c892d1b250b0",
+      "name": "Check for Duplicate Email",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "jhQKHIqNs3Oopi7V",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function generateTempPassword() {\n  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';\n  const lowercase = 'abcdefghijklmnopqrstuvwxyz';\n  const numbers = '0123456789';\n  const symbols = '!@#$%^&*';\n  \n  let password = '';\n  password += uppercase[Math.floor(Math.random() * uppercase.length)];\n  password += lowercase[Math.floor(Math.random() * lowercase.length)];\n  password += numbers[Math.floor(Math.random() * numbers.length)];\n  password += symbols[Math.floor(Math.random() * symbols.length)];\n  \n  const all = uppercase + lowercase + numbers;\n  for (let i = 0; i < 4; i++) {\n    password += all[Math.floor(Math.random() * all.length)];\n  }\n  \n  return password.split('').sort(() => 0.5 - Math.random()).join('');\n}\n\nreturn {\n  temp_password: generateTempPassword()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        560
+      ],
+      "id": "a9b55791-0ed9-4092-8f4d-93aa20426a9f",
+      "name": "Generate Temp Password"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO users (\n  email,\n  full_name,\n  role,\n  department,\n  phone,\n  start_date,\n  password_hash,\n  password_reset_required,\n  status,\n  created_at\n) VALUES (\n  $1, $2, $3, $4, $5, $6, $7, true, 'active', NOW()\n)\nRETURNING id, email, created_at",
+        "options": {
+          "queryReplacement": "=$1 = {{ $('Normalize Email & Name').item.json.email }}, $2 = {{ $('Normalize Email & Name').item.json.full_name }}, $3 = {{ $('Map Roles to Enum').item.json.role }}, $4 = {{ $('Assign Department Default').item.json.department }}, $5 = {{ $('Normalize Phone Number').item.json.phone }}, $6 = {{ $('Normalize Date').item.json.start_date }}, $7 = {{ $json.temp_password }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        528,
+        560
+      ],
+      "id": "239ea9a4-10af-4be5-8b14-00f6219036d4",
+      "name": "Insert User",
+      "credentials": {
+        "postgres": {
+          "id": "jhQKHIqNs3Oopi7V",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ec2ac318-de18-4ad2-875c-e2595560cfff",
+              "name": "tracking",
+              "value": "={   \"successful_users\": [],   \"failed_rows\": [],   \"existing_users\": [],   \"total_processed\": 0,   \"start_time\": \"{{ $now.toISO() }}\" }",
+              "type": "object"
+            },
+            {
+              "id": "c91fb946-fdf5-4e26-b678-e387ca9fb2eb",
+              "name": "request_data",
+              "value": "={{ $input.all()[0] }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        96,
+        -256
+      ],
+      "id": "4c94b5f7-8e08-4579-b594-6a472bbe97e5",
+      "name": "Initialize Tracking"
+    },
+    {
+      "parameters": {
+        "fromEmail": "sanjubatrey@gmail.com",
+        "toEmail": "=sanjanabatrey@gmail.com",
+        "subject": "Welcome to Company! Here's How to Get Started",
+        "emailFormat": "text",
+        "text": "=Hi {{ $('Normalize Email & Name').item.json.full_name }},\n\nYour account has been created and is ready to use.\n\n📧 Email: {{ $json.tracking.successful_users[0].email }}\n🔑 Temporary Password: {{ $('Generate Temp Password').item.json.temp_password }}\n🔗 Login: https://app.company.com/login\n\nNext Steps:\n1. Log in with your temporary password\n2. You'll be prompted to change it\n3. Review your onboarding checklist (attached)\n4. Join our Slack workspace\n\nWelcome aboard!",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        928,
+        560
+      ],
+      "id": "e2765143-17d9-4e12-bc63-46d46da180e3",
+      "name": "Email to User",
+      "webhookId": "70bacfee-3124-470f-aeb9-8f30e1d3e77b",
+      "credentials": {
+        "smtp": {
+          "id": "lBQqFQX1U1axxOXG",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "sanjubatrey@gmail.com",
+        "toEmail": "sanjanabatrey@gmail.com",
+        "subject": "Onboarding Import Summary",
+        "emailFormat": "text",
+        "text": "={{ $node[\"Build Final Report\"].json.report }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        528,
+        -16
+      ],
+      "id": "6af67a97-82e3-4f3f-a6bd-bd3ec42e9bf9",
+      "name": "Email to Admin",
+      "webhookId": "c6080aeb-c6a2-4b32-adf6-d8a4234de27d",
+      "credentials": {
+        "smtp": {
+          "id": "lBQqFQX1U1axxOXG",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B12DF56PM",
+          "mode": "list",
+          "cachedResultName": "onboarding-notifications"
+        },
+        "text": "=🎉 Onboarding Import Complete\n\n📊 Total Processed: {{ $node[\"Build Final Report\"].json.summary.total_processed }}\n✅ Created: {{ $node[\"Build Final Report\"].json.summary.successful }}\n⚠️ Already Existed: {{ $node[\"Build Final Report\"].json.summary.existing }}\n❌ Failed: {{ $node[\"Build Final Report\"].json.summary.failed }}\n📈 Success Rate: {{ $node[\"Build Final Report\"].json.summary.success_rate }}\n⏱️ Duration: {{ $node[\"Build Final Report\"].json.summary.duration_minutes }} mins",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        736,
+        -16
+      ],
+      "id": "2ec7587e-6c47-4f5f-a32f-ce9b6f47a8ac",
+      "name": "Send a message",
+      "webhookId": "e582dc21-a501-40a2-93d7-fd7d9aa8206d",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "IZnea5X2x6xqDcPQ",
+          "name": "Slack OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "51ddf8f1-b623-46b9-9639-2f829175f8ca",
+              "leftValue": "={{ $input.item.json }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1408,
+        352
+      ],
+      "id": "53d21d80-ed1e-4ce5-996a-776bd61aeeb6",
+      "name": "Create or Skip?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $node['Normalize Email & Name'].json.email;\nconst full_name = $node['Normalize Email & Name'].json.full_name;\nconst existingUser = $node['Check for Duplicate Email'].json;\n\nreturn {\n  tracking: {\n    successful_users: [],\n    failed_rows: [],\n    existing_users: [{\n      email,\n      full_name,\n      reason: 'already_exists',\n      existing_user_id: existingUser.id || null,\n      timestamp: new Date().toISOString()\n    }],\n    total_processed: 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        368
+      ],
+      "id": "93e8d1c3-a324-4518-b7d4-8f5ad319f40e",
+      "name": "Handle Existing User"
+    },
+    {
+      "parameters": {
+        "jsCode": "const currentRow = $node[\"Loop Over Items\"].json;\nconst errors = $node[\"Validate Required Fields\"].json.errors || [];\n\nconst failedEntry = {\n  email: currentRow.email || 'unknown',\n  full_name: currentRow.full_name || 'unknown',\n  errors: errors,\n  reason: 'validation_failed',\n  timestamp: new Date().toISOString()\n};\n\nreturn {\n  tracking: {\n    successful_users: [],\n    failed_rows: [failedEntry],\n    existing_users: [],\n    total_processed: 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        160
+      ],
+      "id": "28462115-0642-4311-9952-6b446fdbb9e0",
+      "name": "Handle Validation Failure"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect tracking from all branches that ran\nconst allItems = $input.all();\n\nlet successful_users = [];\nlet failed_rows = [];\nlet existing_users = [];\nlet total_processed = 0;\nlet start_time = $node[\"Initialize Tracking\"].json.tracking.start_time;\n\n// Each item coming in is a completed loop iteration's tracking state\nfor (const item of allItems) {\n  const t = item.json.tracking;\n  if (!t) continue;\n  successful_users = successful_users.concat(t.successful_users || []);\n  failed_rows = failed_rows.concat(t.failed_rows || []);\n  existing_users = existing_users.concat(t.existing_users || []);\n  total_processed += t.total_processed || 0;\n}\n\nconst endTime = new Date();\nconst startTime = new Date(start_time);\nconst durationMinutes = ((endTime - startTime) / 1000 / 60).toFixed(1);\n\nconst successRate = total_processed > 0\n  ? ((successful_users.length / total_processed) * 100).toFixed(1)\n  : '0.0';\n\nreturn {\n  tracking: { successful_users, failed_rows, existing_users, total_processed },\n  summary: {\n    successful: successful_users.length,\n    failed: failed_rows.length,\n    existing: existing_users.length,\n    total_processed,\n    duration_minutes: durationMinutes,\n    success_rate: `${successRate}%`,\n    completed_at: endTime.toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -16
+      ],
+      "id": "c0de63db-bd93-4994-8208-52f20cd22c7e",
+      "name": "Calculate Final Metrics"
+    },
+    {
+      "parameters": {
+        "jsCode": "const summary = $input.first().json.summary;\nconst tracking = $input.first().json.tracking;  \n\nconst successList = tracking.successful_users.length > 0\n  ? tracking.successful_users.map(u => `  ✓ ${u.email}`).join('\\n')\n  : '  None';\n\nconst failedList = tracking.failed_rows.length > 0\n  ? tracking.failed_rows.map(f =>\n      `  ❌ ${f.email} → ${f.errors.join(', ')}`\n    ).join('\\n')\n  : '  None';\n\nconst existingList = tracking.existing_users.length > 0\n  ? tracking.existing_users.map(e =>\n      `  ⚠️ ${e.email} → already exists`\n    ).join('\\n')\n  : '  None';\n\nconst report = `\nONBOARDING IMPORT SUMMARY\n=========================\n📊 Total Processed : ${summary.total_processed}\n✅ Created         : ${summary.successful}\n⚠️  Already Existed : ${summary.existing}\n❌ Failed          : ${summary.failed}\n📈 Success Rate    : ${summary.success_rate}\n⏱️  Duration        : ${summary.duration_minutes} mins\n🕐 Completed At    : ${summary.completed_at}\n\nCREATED USERS:\n${successList}\n\nSKIPPED (EXISTING):\n${existingList}\n\nFAILED ROWS:\n${failedList}\n`;\n\nreturn { report, summary };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -16
+      ],
+      "id": "527b1bc2-f91e-4032-81dc-55a653ea9bcb",
+      "name": "Build Final Report"
+    },
+    {
+      "parameters": {
+        "jsCode": "const successfulUsers = $node[\"Initialize Tracking\"].json.successful_users || [];\nconst failedRows = $node[\"Initialize Tracking\"].json.failed_rows || [];\n\nconst report = `\nONBOARDING IMPORT SUMMARY\n\n✅ Successfully Created: ${successfulUsers.length}\n❌ Errors: ${failedRows.length}\n\nCreated Users:\n${successfulUsers.map(u => `✓ ${u.email}`).join('\\n')}\n\nErrors:\n${failedRows.map(f => `❌ ${f.error}`).join('\\n')}\n`;\n\nreturn { report };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        784
+      ],
+      "id": "18685f6e-2fae-465c-a266-0e7d1d6fcdb9",
+      "name": "Report Details",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $node['Normalize Email & Name'].json.email;\nconst full_name = $node['Normalize Email & Name'].json.full_name;\nconst temp_password = $node['Generate Temp Password'].json.temp_password;\n\n// Build a self-contained tracking snapshot for THIS row only\n// Calculate Final Metrics will merge all snapshots together\nreturn {\n  tracking: {\n    successful_users: [{ email, full_name, timestamp: new Date().toISOString() }],\n    failed_rows: [],\n    existing_users: [],\n    total_processed: 1\n  },\n  temp_password\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        560
+      ],
+      "id": "b63244d3-2722-4db4-9c48-de25b8655f0b",
+      "name": "Update Tracking Success"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  tracking: $node['Update Tracking Success'].json.tracking\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        560
+      ],
+      "id": "1d41fa25-3937-4ca5-a32b-0f990a71a5c5",
+      "name": "Pass Tracking Forward"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Initialize Tracking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Calculate Final Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Vs. URL": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Parse File Based on Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse File Based on Format": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Validation Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation Passed?": {
+      "main": [
+        [
+          {
+            "node": "Normalize Email & Name",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Validation Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Email & Name": {
+      "main": [
+        [
+          {
+            "node": "Normalize Phone Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Phone Number": {
+      "main": [
+        [
+          {
+            "node": "Normalize Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Date": {
+      "main": [
+        [
+          {
+            "node": "Map Roles to Enum",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Roles to Enum": {
+      "main": [
+        [
+          {
+            "node": "Assign Department Default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Department Default": {
+      "main": [
+        [
+          {
+            "node": "Check for Duplicate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for Duplicate Email": {
+      "main": [
+        [
+          {
+            "node": "Create or Skip?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Temp Password": {
+      "main": [
+        [
+          {
+            "node": "Insert User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert User": {
+      "main": [
+        [
+          {
+            "node": "Update Tracking Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Tracking": {
+      "main": [
+        [
+          {
+            "node": "Data Vs. URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email to User": {
+      "main": [
+        [
+          {
+            "node": "Pass Tracking Forward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email to Admin": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Create or Skip?": {
+      "main": [
+        [
+          {
+            "node": "Generate Temp Password",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Existing User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Validation Failure": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Existing User": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Final Metrics": {
+      "main": [
+        [
+          {
+            "node": "Build Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Details": {
+      "main": [
+        []
+      ]
+    },
+    "Build Final Report": {
+      "main": [
+        [
+          {
+            "node": "Email to Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Tracking Success": {
+      "main": [
+        [
+          {
+            "node": "Email to User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass Tracking Forward": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "beba0c8c-4b68-4547-8927-19badc4d2fb9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "99dc3bf3b13ebd2797d10031ad046d78c5daab56c704a37783d11d23ba94aa38"
+  },
+  "id": "FFRmASBJOoGN2NvS",
+  "tags": []
+}
